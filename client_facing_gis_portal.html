@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoClient Portal - Professional GIS Deliverables</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Leaflet CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Turf.js for Spatial Analytics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Hind Siliguri', 'Inter', sans-serif;
+        }
+        #map {
+            height: calc(100vh - 64px);
+            width: 100%;
+            z-index: 1;
+        }
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4b5563;
+        }
+        .leaflet-popup-content-wrapper {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+            border: 1px solid #374151;
+        }
+        .leaflet-popup-tip {
+            background-color: #1f2937;
+        }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 flex flex-col h-screen overflow-hidden">
+
+    <!-- Corporate Header -->
+    <header class="h-16 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-6 z-20 shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="p-2.5 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl text-white font-bold text-xl flex items-center justify-center w-10 h-10 shadow-md">
+                <i class="fa-solid fa-map-location-dot"></i>
+            </div>
+            <div>
+                <div class="flex items-center gap-2">
+                    <h1 class="font-bold text-base leading-tight tracking-wide text-white">GeoClient Portal</h1>
+                    <span class="text-[10px] bg-blue-950 text-blue-400 border border-blue-800 px-2 py-0.5 rounded-full font-mono uppercase">Client Access</span>
+                </div>
+                <p class="text-xs text-gray-400">ক্লিন্ট প্রজেক্ট ও ডেলিভারেবল পোর্টাল (Client Review Suite)</p>
+            </div>
+        </div>
+
+        <!-- Project Selector & Quick Info -->
+        <div class="hidden md:flex items-center space-x-6 text-xs text-gray-300 bg-gray-900/80 px-4 py-2 rounded-xl border border-gray-800">
+            <div>
+                <span class="text-gray-500 block text-[10px]">প্রজেক্ট নাম (Project):</span>
+                <span class="font-semibold text-white">Gulshan & Dhanmondi Cadastral Mapping Phase-II</span>
+            </div>
+            <div class="h-6 w-px bg-gray-800"></div>
+            <div>
+                <span class="text-gray-500 block text-[10px]">ক্লায়েন্ট (Client):</span>
+                <span class="font-semibold text-emerald-400">Urban Land Development Ltd.</span>
+            </div>
+        </div>
+
+        <!-- Top Actions -->
+        <div class="flex items-center space-x-3">
+            <button onclick="openShareModal()" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-3.5 py-2 rounded-lg text-xs font-medium transition flex items-center gap-2 shadow">
+                <i class="fa-solid fa-share-nodes text-blue-400"></i> <span class="hidden sm:inline">শেয়ার লিংক</span>
+            </button>
+            <button onclick="zoomToFullExtent()" class="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-xs font-medium transition flex items-center gap-2 shadow">
+                <i class="fa-solid fa-expand"></i> <span class="hidden sm:inline">ফুল ভিউ</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <div class="flex flex-1 relative overflow-hidden">
+        
+        <!-- Sidebar Panel -->
+        <aside id="sidebar" class="w-[420px] bg-gray-900 border-r border-gray-800 flex flex-col z-10 transition-all duration-300 absolute md:relative h-full shadow-2xl">
+            
+            <!-- Navigation Tabs -->
+            <div class="flex border-b border-gray-800 bg-gray-900 text-xs font-medium text-gray-400">
+                <button onclick="switchTab('milestones')" id="tab-milestones" class="flex-1 py-3 text-center border-b-2 border-blue-500 text-blue-400 font-semibold flex flex-col items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-timeline text-sm"></i> মাইলস্টোন
+                </button>
+                <button onclick="switchTab('maplayers')" id="tab-maplayers" class="flex-1 py-3 text-center border-b-2 border-transparent hover:text-gray-200 flex flex-col items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-layer-group text-sm"></i> লেয়ারসমূহ
+                </button>
+                <button onclick="switchTab('feedback')" id="tab-feedback" class="flex-1 py-3 text-center border-b-2 border-transparent hover:text-gray-200 flex flex-col items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-comments text-sm"></i> ফিডব্যাক পিন
+                </button>
+                <button onclick="switchTab('deliverables')" id="tab-deliverables" class="flex-1 py-3 text-center border-b-2 border-transparent hover:text-gray-200 flex flex-col items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-download text-sm"></i> ডেলিভারেবলস
+                </button>
+            </div>
+
+            <!-- Tab Content Body -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-6">
+
+                <!-- 1. MILESTONES & STATUS TRACKER TAB -->
+                <div id="content-milestones" class="space-y-6">
+                    <div class="bg-gradient-to-br from-gray-850 to-gray-900 p-4 rounded-xl border border-gray-800 space-y-3">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-gray-400">সামগ্রিক প্রজেক্ট অগ্রগতি (Overall Progress)</span>
+                            <span class="text-blue-400 font-bold text-sm">75% Completed</span>
+                        </div>
+                        <div class="w-full bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                            <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2.5 rounded-full" style="width: 75%"></div>
+                        </div>
+                        <div class="flex justify-between text-[11px] text-gray-400 pt-1">
+                            <span>স্ট্যাটাস: <strong class="text-emerald-400">চলমান (Active)</strong></span>
+                            <span>টার্গেট ডেলিভারি: ৩০ জুন ২০২৬</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-diagram-project text-blue-400"></i> মাইলস্টোন টাইমলাইন (Milestone Pipeline)
+                        </h3>
+                        
+                        <!-- Timeline Steps -->
+                        <div class="space-y-4 relative pl-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-800">
+                            
+                            <!-- Step 1 -->
+                            <div class="relative">
+                                <span class="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-gray-900 flex items-center justify-center text-[8px] text-white"><i class="fa-solid fa-check"></i></span>
+                                <div class="bg-gray-850 p-3.5 rounded-xl border border-gray-800 space-y-1">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="text-xs font-bold text-gray-200">1. ডাটা কালেকশন ও রিমোট সেন্সিং</h4>
+                                        <span class="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">সম্পন্ন</span>
+                                    </div>
+                                    <p class="text-[11px] text-gray-400">স্যাটেলাইট ইমেজারি সংগ্রহ এবং ড্রোন সার্ভে ডেটা ইনজেকশন সম্পন্ন।</p>
+                                </div>
+                            </div>
+
+                            <!-- Step 2 -->
+                            <div class="relative">
+                                <span class="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-emerald-500 border-2 border-gray-900 flex items-center justify-center text-[8px] text-white"><i class="fa-solid fa-check"></i></span>
+                                <div class="bg-gray-850 p-3.5 rounded-xl border border-gray-800 space-y-1">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="text-xs font-bold text-gray-200">2. জিওরেফারেন্সিং ও প্রজেকশন</h4>
+                                        <span class="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">সম্পন্ন</span>
+                                    </div>
+                                    <p class="text-[11px] text-gray-400">মৌজা শিটগুলো WGS 84 / UTM Zone 46N সিস্টেমে সঠিকভাবে অ্যালাইন করা হয়েছে।</p>
+                                </div>
+                            </div>
+
+                            <!-- Step 3 -->
+                            <div class="relative">
+                                <span class="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-blue-500 border-2 border-gray-900 animate-pulse flex items-center justify-center text-[8px] text-white"><i class="fa-solid fa-spinner"></i></span>
+                                <div class="bg-gray-850 p-3.5 rounded-xl border border-blue-900/60 shadow-lg space-y-1">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="text-xs font-bold text-blue-300">3. ভেক্টরাইজেশন ও পার্সেল ম্যাপিং</h4>
+                                        <span class="text-[10px] bg-blue-950 text-blue-400 px-2 py-0.5 rounded border border-blue-800">চলমান (Active)</span>
+                                    </div>
+                                    <p class="text-[11px] text-gray-400">প্রতিটি প্লট ও মালিকানা সীমানা পলিগন আকারে ডিজিটাইজেশনের কাজ চলছে।</p>
+                                </div>
+                            </div>
+
+                            <!-- Step 4 -->
+                            <div class="relative">
+                                <span class="absolute -left-6 top-0.5 w-4 h-4 rounded-full bg-gray-700 border-2 border-gray-900 flex items-center justify-center text-[8px] text-gray-400"><i class="fa-solid fa-clock"></i></span>
+                                <div class="bg-gray-850 p-3.5 rounded-xl border border-gray-800 space-y-1 opacity-75">
+                                    <div class="flex justify-between items-center">
+                                        <h4 class="text-xs font-bold text-gray-400">4. চূড়ান্ত রিপোর্ট ও ডেলিভারি</h4>
+                                        <span class="text-[10px] bg-gray-800 text-gray-400 px-2 py-0.5 rounded border border-gray-700">অপেক্ষমাণ</span>
+                                    </div>
+                                    <p class="text-[11px] text-gray-500">ক্লায়েন্ট রিভিউ শেষে চূড়ান্ত পিডিএফ ম্যাপ এবং জিওজেসন ফাইল হ্যান্ডওভার।</p>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. MAP LAYERS TAB -->
+                <div id="content-maplayers" class="space-y-6 hidden">
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-earth-americas text-blue-400"></i> বেসম্যাপ নির্বাচন (Base Maps)
+                        </h3>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button onclick="changeBaseMap('osm')" id="btn-osm" class="basemap-btn bg-blue-950/60 border-2 border-blue-500 text-white rounded-xl p-3 text-xs flex flex-col items-center gap-2 transition shadow">
+                                <i class="fa-solid fa-road text-xl text-blue-400"></i>
+                                <span class="font-medium">OpenStreetMap</span>
+                            </button>
+                            <button onclick="changeBaseMap('satellite')" id="btn-satellite" class="basemap-btn bg-gray-850 border border-gray-800 text-gray-300 hover:bg-gray-800 rounded-xl p-3 text-xs flex flex-col items-center gap-2 transition shadow">
+                                <i class="fa-solid fa-satellite text-xl text-indigo-400"></i>
+                                <span class="font-medium">Esri Satellite</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-layer-group text-blue-400"></i> প্রজেক্ট লেয়ারসমূহ (Vector Layers)
+                        </h3>
+                        <div class="space-y-2.5">
+                            <label class="flex items-center justify-between p-3 bg-gray-850 hover:bg-gray-800 rounded-xl cursor-pointer border border-gray-800 transition">
+                                <div class="flex items-center space-x-3">
+                                    <input type="checkbox" id="chk-parcels" onchange="toggleLayer('parcels')" checked class="w-4 h-4 text-blue-600 rounded bg-gray-800 border-gray-700">
+                                    <span class="text-xs font-medium text-gray-200">ক্যাডাস্ট্রাল পার্সেল বাউন্ডারি (Cadastral Parcels)</span>
+                                </div>
+                                <span class="w-3 h-3 rounded-full bg-blue-500 shadow"></span>
+                            </label>
+
+                            <label class="flex items-center justify-between p-3 bg-gray-850 hover:bg-gray-800 rounded-xl cursor-pointer border border-gray-800 transition">
+                                <div class="flex items-center space-x-3">
+                                    <input type="checkbox" id="chk-gcp" onchange="toggleLayer('gcp')" checked class="w-4 h-4 text-blue-600 rounded bg-gray-800 border-gray-700">
+                                    <span class="text-xs font-medium text-gray-200">জিপিএস কন্ট্রোল পয়েন্ট (GCPs)</span>
+                                </div>
+                                <span class="w-3 h-3 rounded-full bg-amber-500 shadow"></span>
+                            </label>
+
+                            <label class="flex items-center justify-between p-3 bg-gray-850 hover:bg-gray-800 rounded-xl cursor-pointer border border-gray-800 transition">
+                                <div class="flex items-center space-x-3">
+                                    <input type="checkbox" id="chk-zone" onchange="toggleLayer('zone')" checked class="w-4 h-4 text-blue-600 rounded bg-gray-800 border-gray-700">
+                                    <span class="text-xs font-medium text-gray-200">প্রজেক্ট এরিয়া বাউন্ডারি (Project AOI)</span>
+                                </div>
+                                <span class="w-3 h-3 rounded-full bg-emerald-500 shadow"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-950/30 border border-blue-900/50 p-4 rounded-xl space-y-2">
+                        <h4 class="text-xs font-bold text-blue-300 flex items-center gap-2">
+                            <i class="fa-solid fa-circle-info"></i> নির্দেশিকা (Instructions)
+                        </h4>
+                        <p class="text-[11px] text-gray-300 leading-relaxed">ম্যাপের যেকোনো পার্সেল বা পয়েন্টে ক্লিক করলে সংশ্লিষ্ট মালিকানা ও সার্ভে ডাটা দেখতে পাবেন।</p>
+                    </div>
+                </div>
+
+                <!-- 3. FEEDBACK & MAP COMMENT SECTION -->
+                <div id="content-feedback" class="space-y-5 hidden">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 flex items-center gap-2">
+                            <i class="fa-solid fa-comment-dots text-blue-400"></i> ক্লায়েন্ট ফিডব্যাক ও পিন নোট
+                        </h3>
+                    </div>
+
+                    <!-- Add Feedback Box -->
+                    <div class="bg-gray-850 p-4 rounded-xl border border-gray-800 space-y-3">
+                        <p class="text-xs text-gray-300">ম্যাপের নির্দিষ্ট স্থানে পিন বসিয়ে বা সাধারণ কমেন্ট লিখে আপনার মতামত বা সংশোধন জানান:</p>
+                        <div>
+                            <label class="text-[11px] text-gray-400 block mb-1">আপনার নাম / পদবি:</label>
+                            <input type="text" id="feedbackAuthor" value="Engr. Farhan (Client Rep)" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                        </div>
+                        <div>
+                            <label class="text-[11px] text-gray-400 block mb-1">সংশোধন বা মতামত (Comment):</label>
+                            <textarea id="feedbackText" rows="3" placeholder="যেমন: প্লট নং-২০৪ এর সীমানা কিছুটা সংশোধন প্রয়োজন..." class="w-full bg-gray-800 border border-gray-700 rounded-lg p-3 text-xs text-white focus:outline-none focus:border-blue-500"></textarea>
+                        </div>
+                        <button onclick="enableFeedbackPinMode()" id="btnPinMode" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs py-2.5 rounded-lg font-medium transition flex items-center justify-center gap-2 shadow">
+                            <i class="fa-solid fa-map-pin"></i> ম্যাপে পিন বসিয়ে কমেন্ট সাবমিট করুন
+                        </button>
+                    </div>
+
+                    <!-- Feedback List -->
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-400 mb-3 flex items-center justify-between">
+                            <span>জমা হওয়া কমেন্টসসমূহ (<span id="feedbackCount">2</span>)</span>
+                            <i class="fa-solid fa-list text-gray-500"></i>
+                        </h4>
+                        <div id="feedbackListContainer" class="space-y-3 max-h-60 overflow-y-auto">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. DELIVERABLES & EXPORT TAB -->
+                <div id="content-deliverables" class="space-y-5 hidden">
+                    <div>
+                        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-3 flex items-center gap-2">
+                            <i class="fa-solid fa-file-arrow-down text-blue-400"></i> ম্যাপ ডেলিভারেবলস ডাউনলোড সেন্টার
+                        </h3>
+                        <p class="text-xs text-gray-300 mb-4">প্রজেক্টের চূড়ান্ত ফাইলসমূহ এখান থেকে সরাসরি ডাউনলোড করতে পারবেন:</p>
+                        
+                        <div class="space-y-3">
+                            <!-- Item 1 -->
+                            <div class="bg-gray-850 p-4 rounded-xl border border-gray-800 flex items-center justify-between gap-3 transition hover:border-blue-500">
+                                <div class="flex items-center space-x-3">
+                                    <div class="p-3 bg-red-950/60 text-red-400 rounded-xl border border-red-900/50">
+                                        <i class="fa-solid fa-file-pdf text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-bold text-gray-200">Cadastral Survey Report (PDF)</h4>
+                                        <p class="text-[10px] text-gray-400">Detailed boundary descriptions & statistics • 14.2 MB</p>
+                                    </div>
+                                </div>
+                                <button onclick="downloadDeliverable('PDF Report')" class="bg-gray-800 hover:bg-blue-600 text-gray-200 hover:text-white px-3 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow">
+                                    <i class="fa-solid fa-download"></i> ডাউনলোড
+                                </button>
+                            </div>
+
+                            <!-- Item 2 -->
+                            <div class="bg-gray-850 p-4 rounded-xl border border-gray-800 flex items-center justify-between gap-3 transition hover:border-blue-500">
+                                <div class="flex items-center space-x-3">
+                                    <div class="p-3 bg-indigo-950/60 text-indigo-400 rounded-xl border border-indigo-900/50">
+                                        <i class="fa-solid fa-file-code text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-bold text-gray-200">Parcel Vector Data (GeoJSON)</h4>
+                                        <p class="text-[10px] text-gray-400">WGS 84 spatial polygons & attributes • 3.8 MB</p>
+                                    </div>
+                                </div>
+                                <button onclick="downloadDeliverable('GeoJSON Dataset')" class="bg-gray-800 hover:bg-blue-600 text-gray-200 hover:text-white px-3 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow">
+                                    <i class="fa-solid fa-download"></i> ডাউনলোড
+                                </button>
+                            </div>
+
+                            <!-- Item 3 -->
+                            <div class="bg-gray-850 p-4 rounded-xl border border-gray-800 flex items-center justify-between gap-3 transition hover:border-blue-500">
+                                <div class="flex items-center space-x-3">
+                                    <div class="p-3 bg-emerald-950/60 text-emerald-400 rounded-xl border border-emerald-900/50">
+                                        <i class="fa-solid fa-table text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h4 class="text-xs font-bold text-gray-200">Land Ownership Attribute Table (CSV)</h4>
+                                        <p class="text-[10px] text-gray-400">JL numbers, plot owners & area sq.ft • 850 KB</p>
+                                    </div>
+                                </div>
+                                <button onclick="downloadDeliverable('CSV Attribute Table')" class="bg-gray-800 hover:bg-blue-600 text-gray-200 hover:text-white px-3 py-2 rounded-lg text-xs font-medium transition flex items-center gap-1.5 shadow">
+                                    <i class="fa-solid fa-download"></i> ডাউনলোড
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Sidebar Footer Status -->
+            <div class="p-3 bg-gray-900 border-t border-gray-800 text-[11px] text-gray-400 flex items-center justify-between">
+                <span><i class="fa-solid fa-shield-halved text-emerald-400 mr-1"></i> Secured Client Portal v2.4</span>
+                <span class="font-mono text-gray-500">EPSG:4326</span>
+            </div>
+
+        </aside>
+
+        <!-- Map Container -->
+        <main class="flex-1 relative">
+            <div id="map"></div>
+
+            <!-- Floating Notification Badge -->
+            <div id="pinNotification" class="absolute top-4 left-4 z-10 bg-blue-950/90 border border-blue-600 text-blue-200 px-4 py-2.5 rounded-xl shadow-2xl backdrop-blur-md hidden flex items-center gap-3 text-xs">
+                <i class="fa-solid fa-bullseye text-blue-400 animate-ping"></i>
+                <span>ম্যাপের যেকোনো জায়গায় ক্লিক করে আপনার ফিডব্যাক পিন বসান।</span>
+                <button onclick="cancelPinMode()" class="text-gray-400 hover:text-white ml-2"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+        </main>
+
+    </div>
+
+    <!-- Share Link Modal -->
+    <div id="shareModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center hidden">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-share-nodes text-blue-400"></i> ক্লায়েন্ট শেয়ার লিংক (Client Share Link)
+                </h3>
+                <button onclick="closeShareModal()" class="text-gray-400 hover:text-white text-sm"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <p class="text-xs text-gray-300">এই প্রজেক্ট পোর্টালটি আপনার ক্লায়েন্ট বা স্টেকহোল্ডারের সাথে শেয়ার করার জন্য নিচের লিংকটি ব্যবহার করুন:</p>
+            <div class="flex gap-2">
+                <input type="text" id="shareUrlInput" readonly value="https://geoclient.portal/project/gulshan-phase2-ref984" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-xs text-gray-300 font-mono focus:outline-none">
+                <button onclick="copyShareLink()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-4 py-2 rounded-lg font-medium transition whitespace-nowrap shadow">কপি</button>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeShareModal()" class="bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs px-4 py-2 rounded-lg font-medium transition">বন্ধ করুন</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Script Application Logic -->
+    <script>
+        let map;
+        let activeBaseLayer;
+        let layerGroups = {};
+        let feedbackPinMode = false;
+        let clientFeedbacks = [
+            { id: 1, author: 'Engr. Farhan (Client Rep)', text: 'ধানমণ্ডি রোড-১২ এর পার্সেল সীমানাটি যাচাই করুন।', lat: 23.7461, lng: 90.3742, time: '2 hours ago' },
+            { id: 2, author: 'Director Urban Ltd.', text: 'GCP-04 পয়েন্টের কোঅর্ডিনেট নিখুঁত রয়েছে। কাজ চালিয়ে যান।', lat: 23.7937, lng: 90.4066, time: 'Yesterday' }
+        ];
+
+        const baseMaps = {
+            osm: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 18,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, USDA, USGS'
+            })
+        };
+
+        window.onload = function() {
+            initMap();
+            renderFeedbacks();
+        };
+
+        function initMap() {
+            const centerCoords = [23.7710, 90.3950]; // Dhaka area
+            
+            map = L.map('map', {
+                center: centerCoords,
+                zoom: 13,
+                zoomControl: false
+            });
+
+            L.control.zoom({ position: 'topright' }).addTo(map);
+
+            activeBaseLayer = baseMaps.osm;
+            activeBaseLayer.addTo(map);
+
+            layerGroups.parcels = new L.FeatureGroup();
+            layerGroups.gcp = new L.FeatureGroup();
+            layerGroups.zone = new L.FeatureGroup();
+            layerGroups.feedbackPins = new L.FeatureGroup();
+
+            map.addLayer(layerGroups.parcels);
+            map.addLayer(layerGroups.gcp);
+            map.addLayer(layerGroups.zone);
+            map.addLayer(layerGroups.feedbackPins);
+
+            loadSampleVectorData();
+
+            map.on('click', function(e) {
+                if (feedbackPinMode) {
+                    saveFeedbackPin(e.latlng);
+                }
+            });
+        }
+
+        function loadSampleVectorData() {
+            // Project AOI Polygon
+            const aoiGeoJSON = {
+                "type": "Feature",
+                "properties": { "name": "Gulshan & Dhanmondi AOI" },
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [[90.380, 23.790], [90.415, 23.790], [90.415, 23.750], [90.380, 23.750], [90.380, 23.790]]
+                    ]
+                }
+            };
+            L.geoJSON(aoiGeoJSON, {
+                style: { color: '#10b981', weight: 2, fillColor: '#10b981', fillOpacity: 0.1, dashArray: '5, 5' }
+            }).bindPopup('<b>প্রজেক্ট এরিয়া বাউন্ডারি (AOI)</b><br>كل এলাকা: ১২.৫ বর্গ কিঃমিঃ').addTo(layerGroups.zone);
+
+            // Cadastral Parcels
+            const parcelsGeoJSON = [
+                {
+                    "type": "Feature",
+                    "properties": { "plotNo": "Plot-102", "mouza": "Gulshan (JL-18)", "owner": "ABC Holdings", "area": "4,500 sq.ft" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[90.400, 23.780], [90.408, 23.780], [90.408, 23.774], [90.400, 23.774], [90.400, 23.780]]]
+                    }
+                },
+                {
+                    "type": "Feature",
+                    "properties": { "plotNo": "Plot-204", "mouza": "Dhanmondi (JL-42)", "owner": "Vertex Properties", "area": "6,200 sq.ft" },
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[90.370, 23.750], [90.378, 23.750], [90.378, 23.744], [90.370, 23.744], [90.370, 23.750]]]
+                    }
+                }
+            ];
+
+            L.geoJSON(parcelsGeoJSON, {
+                style: { color: '#3b82f6', weight: 2, fillColor: '#3b82f6', fillOpacity: 0.25 },
+                onEachFeature: function(feature, layer) {
+                    const p = feature.properties;
+                    layer.bindPopup(`<b>${p.plotNo}</b><br>মৌজা: ${p.mouza}<br>মালিক: ${p.owner}<br>আয়তন: ${p.area}`);
+                }
+            }).addTo(layerGroups.parcels);
+
+            // GCP Points
+            const gcpData = [
+                { lat: 23.785, lng: 90.390, name: 'GCP-01 (Gulshan North)' },
+                { lat: 23.745, lng: 90.375, name: 'GCP-02 (Dhanmondi Lake)' }
+            ];
+
+            gcpData.forEach(pt => {
+                const marker = L.circleMarker([pt.lat, pt.lng], {
+                    radius: 8,
+                    color: '#ffffff',
+                    weight: 2,
+                    fillColor: '#f59e0b',
+                    fillOpacity: 1
+                });
+                marker.bindPopup(`<b>জিপিএস কন্ট্রোল পয়েন্ট:</b> ${pt.name}<br>Lat: ${pt.lat}, Lng: ${pt.lng}`);
+                layerGroups.gcp.addLayer(marker);
+            });
+
+            renderExistingFeedbackPins();
+        }
+
+        // Base Map Switcher
+        function changeBaseMap(name) {
+            if (activeBaseLayer) map.removeLayer(activeBaseLayer);
+            activeBaseLayer = baseMaps[name];
+            activeBaseLayer.addTo(map);
+
+            document.querySelectorAll('.basemap-btn').forEach(btn => {
+                btn.classList.remove('bg-blue-950/60', 'border-blue-500', 'text-white');
+                btn.classList.add('bg-gray-850', 'border-gray-800', 'text-gray-300');
+            });
+            const activeBtn = document.getElementById(`btn-${name}`);
+            activeBtn.classList.remove('bg-gray-850', 'border-gray-800', 'text-gray-300');
+            activeBtn.classList.add('bg-blue-950/60', 'border-blue-500', 'text-white');
+        }
+
+        function toggleLayer(key) {
+            const chk = document.getElementById(`chk-${key}`);
+            if (chk.checked) map.addLayer(layerGroups[key]);
+            else map.removeLayer(layerGroups[key]);
+        }
+
+        // Sidebar Tabs Switcher
+        function switchTab(tab) {
+            const tabs = ['milestones', 'maplayers', 'feedback', 'deliverables'];
+            tabs.forEach(t => {
+                document.getElementById(`content-${t}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-${t}`);
+                btn.classList.remove('border-blue-500', 'text-blue-400', 'font-semibold');
+                btn.classList.add('border-transparent', 'text-gray-400');
+            });
+
+            document.getElementById(`content-${tab}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-${tab}`);
+            activeBtn.classList.remove('border-transparent', 'text-gray-400');
+            activeBtn.classList.add('border-blue-500', 'text-blue-400', 'font-semibold');
+        }
+
+        // Feedback & Pin Management
+        function enableFeedbackPinMode() {
+            const text = document.getElementById('feedbackText').value.trim();
+            if (!text) {
+                alert('দয়া করে কমেন্ট বক্সে আপনার মতামত বা সংশোধন লিখুন।');
+                return;
+            }
+            feedbackPinMode = true;
+            document.getElementById('pinNotification').classList.remove('hidden');
+            switchTab('maplayers'); // switch to map to let user click
+        }
+
+        function cancelPinMode() {
+            feedbackPinMode = false;
+            document.getElementById('pinNotification').classList.add('hidden');
+        }
+
+        function saveFeedbackPin(latlng) {
+            const author = document.getElementById('feedbackAuthor').value.trim() || 'Client User';
+            const text = document.getElementById('feedbackText').value.trim();
+
+            const newFb = {
+                id: Date.now(),
+                author,
+                text,
+                lat: latlng.lat,
+                lng: latlng.lng,
+                time: 'Just now'
+            };
+
+            clientFeedbacks.unshift(newFb);
+            renderFeedbacks();
+            renderExistingFeedbackPins();
+
+            feedbackPinMode = false;
+            document.getElementById('pinNotification').classList.add('hidden');
+            document.getElementById('feedbackText').value = '';
+            switchTab('feedback');
+            alert('আপনার ফিডব্যাক পিন ম্যাপে সফলভাবে যুক্ত হয়েছে!');
+        }
+
+        function renderFeedbacks() {
+            const container = document.getElementById('feedbackListContainer');
+            document.getElementById('feedbackCount').innerText = clientFeedbacks.length;
+            container.innerHTML = '';
+
+            clientFeedbacks.forEach(fb => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-850 border border-gray-800 p-3.5 rounded-xl space-y-1.5 transition hover:border-blue-500';
+                div.innerHTML = `
+                    <div class="flex items-center justify-between">
+                        <span class="font-bold text-xs text-blue-300"><i class="fa-solid fa-circle-user mr-1"></i>${fb.author}</span>
+                        <span class="text-[10px] text-gray-500">${fb.time}</span>
+                    </div>
+                    <p class="text-xs text-gray-200">${fb.text}</p>
+                    <div class="flex items-center justify-between pt-1">
+                        <span class="text-[10px] text-gray-400 font-mono"><i class="fa-solid fa-location-dot text-red-400 mr-1"></i>${fb.lat.toFixed(4)}, ${fb.lng.toFixed(4)}</span>
+                        <button onclick="zoomToFeedback(${fb.lat}, ${fb.lng})" class="text-[10px] text-blue-400 hover:underline">ম্যাপে দেখুন</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function renderExistingFeedbackPins() {
+            layerGroups.feedbackPins.clearLayers();
+            clientFeedbacks.forEach(fb => {
+                const marker = L.marker([fb.lat, fb.lng], {
+                    icon: L.divIcon({
+                        className: 'custom-pin',
+                        html: '<div style="background-color: #ef4444; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 10px; border: 2px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-comment"></i></div>',
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    })
+                });
+                marker.bindPopup(`<b>${fb.author}</b><br>${fb.text}<br><span class="text-gray-400 text-[10px]">${fb.time}</span>`);
+                layerGroups.feedbackPins.addLayer(marker);
+            });
+        }
+
+        function zoomToFeedback(lat, lng) {
+            map.setView([lat, lng], 16);
+        }
+
+        // Deliverable Download Mock
+        function downloadDeliverable(title) {
+            alert(`"${title}" ফাইলটি সফলভাবে ডাউনলোড শুরু হয়েছে। ধন্যবাদ!`);
+        }
+
+        // Share Modal
+        function openShareModal() {
+            document.getElementById('shareModal').classList.remove('hidden');
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').classList.add('hidden');
+        }
+
+        function copyShareLink() {
+            const input = document.getElementById('shareUrlInput');
+            input.select();
+            document.execCommand('copy');
+            alert('শেয়ার লিংক ক্লিপবোর্ডে কপি করা হয়েছে!');
+        }
+
+        function zoomToFullExtent() {
+            map.setView([23.7710, 90.3950], 13);
+        }
+    </script>
+</body>
+</html>
